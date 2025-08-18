@@ -1,6 +1,7 @@
 import { Consumer, EachMessagePayload, Kafka, KafkaConfig } from "kafkajs";
 import { MessageBroker } from "../types/broker";
 import config from "config";
+import { handleProductUpdate } from "../productcache/productUpdateHandler";
 
 export class KafkaBroker implements MessageBroker {
   private consumer: Consumer;
@@ -61,16 +62,16 @@ export class KafkaBroker implements MessageBroker {
           topic,
           partition,
         });
-        // switch (topic) {
-        //   case "product":
-        //     await handleProductUpdate(message.value.toString());
-        //     return;
-        //   case "topping":
-        //     await handleToppingUpdate(message.value.toString());
-        //     return;
-        //   default:
-        //     console.log("Doing nothing...");
-        // }
+        switch (topic) {
+          case "product":
+            await handleProductUpdate(message.value.toString());
+            return;
+          // case "topping":
+          //   await handleToppingUpdate(message.value.toString());
+          //   return;
+          default:
+            console.log("Doing nothing...");
+        }
       },
     });
   }
