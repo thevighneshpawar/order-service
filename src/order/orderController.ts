@@ -7,13 +7,29 @@ import {
 } from "../types";
 import productCacheModel from "../productcache/productCache.model";
 import toppingCacheModel from "../toppingCache/toppingCache.model";
+import couponModel from "../coupon/couponModel";
 
 export class OrderController {
   create = async (req: Request, res: Response) => {
     // todo: validate request data.
     console.log(req.body.cart);
     const totalPrice = await this.calculateTotal(req.body.cart);
-    return res.json({ totalPrice: totalPrice });
+
+    let discountPercentage = 0;
+
+    const couponCode = req.body.couponCode;
+    const tenantId = req.body.tenantId;
+
+    if (couponCode) {
+      discountPercentage = await this.getDiscountPercentage(
+        couponCode,
+        tenantId,
+      );
+    }
+
+    const discountAmount = Math.round((totalPrice * discountPercentage) / 100);
+
+    return res.json({ discountAmount: discountAmount });
   };
 
   private calculateTotal = async (cart: CartItem[]) => {
@@ -80,24 +96,35 @@ export class OrderController {
       item.chosenConfiguration.priceConfiguration,
     ).reduce((acc, [key, value]) => {
       let price = 0;
-      
+
       // Use cached price if available, otherwise fallback to client value
-      if (cachedProductPrice && 
-          cachedProductPrice.priceConfiguration[key] && 
-          cachedProductPrice.priceConfiguration[key].availableOptions[value]) {
-        price = cachedProductPrice.priceConfiguration[key].availableOptions[value];
-        console.log(`Using cached price for product ${item._id}, config ${key}: ${price}`);
+      if (
+        cachedProductPrice &&
+        cachedProductPrice.priceConfiguration[key] &&
+        cachedProductPrice.priceConfiguration[key].availableOptions[value]
+      ) {
+        price =
+          cachedProductPrice.priceConfiguration[key].availableOptions[value];
+        console.log(
+          `Using cached price for product ${item._id}, config ${key}: ${price}`,
+        );
       } else {
         // Fallback to client-side price configuration
-        if (item.priceConfiguration[key] && 
-            item.priceConfiguration[key].availableOptions[value]) {
+        if (
+          item.priceConfiguration[key] &&
+          item.priceConfiguration[key].availableOptions[value]
+        ) {
           price = item.priceConfiguration[key].availableOptions[value];
-          console.log(`Using client price for product ${item._id}, config ${key}: ${price} (cache not available)`);
+          console.log(
+            `Using client price for product ${item._id}, config ${key}: ${price} (cache not available)`,
+          );
         } else {
-          console.warn(`No price found for product ${item._id}, config ${key}: ${value}`);
+          console.warn(
+            `No price found for product ${item._id}, config ${key}: ${value}`,
+          );
         }
       }
-      
+
       return acc + price;
     }, 0);
 
@@ -114,11 +141,35 @@ export class OrderController {
 
     if (!currentTopping) {
       // todo: Make sure the item is in the cache else, maybe call catalog service.
-      console.log(`Using client price for topping ${topping.id}: ${topping.price} (cache not available)`);
+      console.log(
+        `Using client price for topping ${topping.id}: ${topping.price} (cache not available)`,
+      );
       return topping.price;
     }
 
-    console.log(`Using cached price for topping ${topping.id}: ${currentTopping.price}`);
+    console.log(
+      `Using cached price for topping ${topping.id}: ${currentTopping.price}`,
+    );
     return currentTopping.price;
+  };
+
+  private getDiscountPercentage = async (
+    couponCode: string,
+    tenantId: string,
+  ) => {
+    const code = await couponModel.findOne({ code: couponCode, tenantId });
+
+    if (!code) {
+      return 0;
+    }
+
+    const currentDate = new Date();
+    const couponDate = new Date(code.validUpto);
+
+    if (currentDate <= couponDate) {
+      return code.discount;
+    }
+
+    return 0;
   };
 }
