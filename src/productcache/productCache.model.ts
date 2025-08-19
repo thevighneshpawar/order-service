@@ -12,16 +12,19 @@ const priceSchema = new mongoose.Schema({
   },
 });
 
-const productCacheSchema = new mongoose.Schema<ProductPricingCache>({
-  productId: {
-    type: String,
-    required: true,
+const productCacheSchema = new mongoose.Schema<ProductPricingCache>(
+  {
+    productId: {
+      type: String,
+      required: true,
+    },
+    priceConfiguration: {
+      type: Object,
+      of: priceSchema,
+    },
   },
-  priceConfiguration: {
-    type: Object,
-    of: priceSchema,
-  },
-});
+  { timestamps: true },
+);
 
 export default mongoose.model(
   "ProductCache",

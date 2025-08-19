@@ -26,12 +26,25 @@ export interface ProductPricingCache {
 
 export interface ProductMessage {
   event_type: ProductEvents;
-
   id: string;
   priceConfiguration: PriceConfiguration;
 }
+
 export enum ProductEvents {
   PRODUCT_CREATE = "PRODUCT_CREATE",
   PRODUCT_UPDATE = "PRODUCT_UPDATE",
   PRODUCT_DELETE = "PRODUCT_DELETE",
+}
+
+export interface ToppingMessage {
+  event_type: ToppingEvents;
+  id: string;
+  price: number;
+  tenantId: string;
+}
+
+export enum ToppingEvents {
+  Topping_CREATE = "Topping_CREATE",
+  Topping_UPDATE = "Topping_UPDATE",
+  Topping_DELETE = "Topping_DELETE",
 }
