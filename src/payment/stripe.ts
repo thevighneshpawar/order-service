@@ -15,6 +15,7 @@ export class StripeGW implements PaymentGW {
         metadata: {
           orderId: options.orderId,
         },
+        billing_address_collection: "required",
         line_items: [
           {
             price_data: {
