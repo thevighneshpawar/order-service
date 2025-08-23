@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { Request } from "express-jwt";
 import customerModel from "./customerModel";
-import logger from "../config/logger";
+import logger from "../configuration/logger";
 
 export class CustomerController {
   getCustomer = async (req: Request, res: Response) => {

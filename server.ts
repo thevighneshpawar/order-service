@@ -1,7 +1,7 @@
 import app from "./src/app";
 import config from "config";
-import logger from "./src/config/logger";
-import connectDB from "./src/config/db";
+import logger from "./src/configuration/logger";
+import connectDB from "./src/configuration/db";
 
 import { MessageBroker } from "./src/types/broker";
 import { createMessageBroker } from "./src/common/factories/brokerFactory";
@@ -14,6 +14,7 @@ const startServer = async () => {
     await connectDB();
     broker = await createMessageBroker();
     await broker.connectConsumer();
+    await broker.connectProducer();
     await broker.consumeMessage(["product", "topping"], false);
 
     app
@@ -26,6 +27,7 @@ const startServer = async () => {
     logger.error("Error happened: ", err.message);
     if (broker) {
       await broker.disconnectConsumer();
+      await broker.disconnectProducer();
     }
     process.exit(1);
   }

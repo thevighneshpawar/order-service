@@ -1,5 +1,5 @@
 import config from "config";
-import { KafkaBroker } from "../../config/kafka";
+import { KafkaBroker } from "../../configuration/kafka";
 import { MessageBroker } from "../../types/broker";
 
 let broker: MessageBroker | null = null;

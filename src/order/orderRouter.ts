@@ -4,9 +4,11 @@ import { asyncWrapper } from "../utils";
 import { OrderController } from "./orderController";
 import { StripeGW } from "../payment/stripe";
 import { createGateway } from "../common/factories/gatewayFactory";
+import { createMessageBroker } from "../common/factories/brokerFactory";
 const router = express.Router();
 const paymentGw = createGateway();
-const orderController = new OrderController(paymentGw);
+const broker = createMessageBroker();
+const orderController = new OrderController(paymentGw, broker);
 
 router.post("/", authenticate, asyncWrapper(orderController.create));
 
