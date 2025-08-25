@@ -1,21 +1,29 @@
 import { NextFunction, Request, Response } from "express";
 import {
+  AuthRequest,
   CartItem,
   ProductPricingCache,
   Topping,
+  ROLES,
   ToppingPriceCache,
 } from "../types";
 import productCacheModel from "../productcache/productCache.model";
 import toppingCacheModel from "../toppingCache/toppingCache.model";
 import couponModel from "../coupon/couponModel";
 import orderModel from "./orderModel";
-import { OrderStatus, PaymentMode, PaymentStatus } from "./orderTypes";
+import {
+  OrderEvents,
+  OrderStatus,
+  PaymentMode,
+  PaymentStatus,
+} from "./orderTypes";
 import logger from "../configuration/logger";
 import idempotencyModel from "../idempotency/idempotencyModel";
 import mongoose from "mongoose";
 import createHttpError from "http-errors";
 import { PaymentGW } from "../payment/paymentTypes";
 import { MessageBroker } from "../types/broker";
+import customerModel from "../customer/customerModel";
 
 export class OrderController {
   constructor(
@@ -125,6 +133,170 @@ export class OrderController {
 
     // todo: Update order document -> paymentId -> sessionId
     return res.json({ paymentUrl: null });
+  };
+
+  getAll = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const { role, tenant: userTenantId } = req.auth;
+
+    const tenantId = req.query.tenantId;
+
+    if (role === ROLES.CUSTOMER) {
+      return next(createHttpError(403, "Not allowed."));
+    }
+
+    if (role === ROLES.ADMIN) {
+      const filter = {};
+
+      if (tenantId) {
+        filter["tenantId"] = tenantId;
+      }
+
+      // todo: VERY IMPORTANT. add pagination.
+      const orders = await orderModel
+        .find(filter, {}, { sort: { createdAt: -1 } })
+        .populate("customerId")
+        .exec();
+
+      // todo: add logger
+      return res.json(orders);
+    }
+
+    if (role === ROLES.MANAGER) {
+      const orders = await orderModel
+        .find({ tenantId: userTenantId }, {}, { sort: { createdAt: -1 } })
+        .populate("customerId")
+        .exec();
+
+      return res.json(orders);
+    }
+
+    return next(createHttpError(403, "Not allowed."));
+  };
+
+  getMine = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const userId = req.auth.sub;
+
+    if (!userId) {
+      return next(createHttpError(400, "No userId found."));
+    }
+
+    // todo: Add error handling.
+    const customer = await customerModel.findOne({ userId });
+
+    if (!customer) {
+      return next(createHttpError(400, "No customer found."));
+    }
+
+    // todo: implement pagination.
+    const orders = await orderModel.find(
+      { customerId: customer._id },
+      { cart: 0 },
+    );
+
+    return res.json(orders);
+  };
+
+  getSingle = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const orderId = req.params.orderId;
+    const { sub: userId, role, tenant: tenantId } = req.auth;
+
+    const fields = req.query.fields
+      ? req.query.fields.toString().split(",")
+      : []; // ["orderStatus", "paymentStatus"]
+
+    const projection = fields.reduce(
+      (acc, field) => {
+        acc[field] = 1;
+        return acc;
+      },
+      { customerId: 1 },
+    );
+
+    // {
+    //   orderStatus: 1,
+    //   PaymentStatus: 1,
+    // }
+
+    const order = await orderModel
+      .findOne({ _id: orderId }, projection)
+      .populate("customerId")
+      .exec();
+    if (!order) {
+      return next(createHttpError(400, "Order does not exists."));
+    }
+
+    // What roles can access this endpoint: Admin, manager (for their own restaurant), customer (own order)
+    if (role === "admin") {
+      return res.json(order);
+    }
+
+    const myRestaurantOrder = order.tenantId === tenantId;
+    if (role === "manager" && myRestaurantOrder) {
+      return res.json(order);
+    }
+
+    if (role === "customer") {
+      const customer = await customerModel.findOne({ userId });
+
+      if (!customer) {
+        return next(createHttpError(400, "No customer found."));
+      }
+
+      if (order.customerId._id.toString() === customer._id.toString()) {
+        return res.json(order);
+      }
+    }
+
+    return next(createHttpError(403, "Operation not permitted."));
+  };
+
+  changeStatus = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    const { role, tenant: tenantId } = req.auth;
+    const orderId = req.params.orderId;
+
+    if (role === ROLES.MANAGER || ROLES.ADMIN) {
+      const order = await orderModel.findOne({ _id: orderId });
+      if (!order) {
+        return next(createHttpError(400, "Order not found."));
+      }
+
+      const isMyRestaurantOrder = order.tenantId === tenantId;
+
+      if (role === ROLES.MANAGER && !isMyRestaurantOrder) {
+        return next(createHttpError(403, "Not allowed."));
+      }
+
+      const updatedOrder = await orderModel.findOneAndUpdate(
+        { _id: orderId },
+        // todo: req.body.status <- Put proper validation.
+        { orderStatus: req.body.status },
+        { new: true },
+      );
+
+      const customer = await customerModel.findOne({
+        _id: updatedOrder.customerId,
+      });
+
+      // todo: add logging
+      const brokerMessage = {
+        event_type: OrderEvents.ORDER_STATUS_UPDATE,
+        data: { ...updatedOrder.toObject(), customerId: customer },
+      };
+
+      await this.broker.sendMessage(
+        "order",
+        JSON.stringify(brokerMessage),
+        updatedOrder._id.toString(),
+      );
+
+      return res.json({ _id: updatedOrder._id });
+    }
+
+    return next(createHttpError(403, "Not allowed."));
   };
 
   private calculateTotal = async (cart: CartItem[]) => {
