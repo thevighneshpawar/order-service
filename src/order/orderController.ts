@@ -116,6 +116,16 @@ export class OrderController {
     // Payment processing...
     // todo: Error handling...
     // todo: add logging
+
+    const customer = await customerModel.findOne({
+      _id: newOrder[0].customerId,
+    });
+
+    const brokerMessage = {
+      event_type: OrderEvents.ORDER_CREATE,
+      data: { ...newOrder[0], customerId: customer },
+    };
+
     if (paymentMode === PaymentMode.CARD) {
       const session = await this.paymentGw.createSession({
         amount: finalTotal,
@@ -124,12 +134,21 @@ export class OrderController {
         currency: "inr",
         idempotenencyKey: idempotencyKey as string,
       });
-      await this.broker.sendMessage("order", JSON.stringify(newOrder));
+
+      await this.broker.sendMessage(
+        "order",
+        JSON.stringify(brokerMessage),
+        newOrder[0]._id.toString(),
+      );
 
       return res.json({ paymentUrl: session.paymentUrl });
     }
 
-    await this.broker.sendMessage("order", JSON.stringify(newOrder));
+    await this.broker.sendMessage(
+      "order",
+      JSON.stringify(brokerMessage),
+      newOrder[0]._id.toString(),
+    );
 
     // todo: Update order document -> paymentId -> sessionId
     return res.json({ paymentUrl: null });
