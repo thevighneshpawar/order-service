@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import orderModel from "../order/orderModel";
 import { PaymentGW } from "./paymentTypes";
-import { PaymentStatus } from "../order/orderTypes";
+import { OrderEvents, PaymentStatus } from "../order/orderTypes";
 import { MessageBroker } from "../types/broker";
 
 export class PaymentController {
@@ -30,11 +30,17 @@ export class PaymentController {
         },
         { new: true },
       );
-
-      console.log(verifiedSession.paymentStatus);
-
       // todo: Think about broker message fail.
-      await this.broker.sendMessage("order", JSON.stringify(updatedOrder));
+      const brokerMessage = {
+        event_type: OrderEvents.PAYMENT_STATUS_UPDATE,
+        data: updatedOrder,
+      };
+
+      await this.broker.sendMessage(
+        "order",
+        JSON.stringify(brokerMessage),
+        updatedOrder._id.toString(),
+      );
     }
 
     return res.json({ success: true });
