@@ -6,8 +6,22 @@ import authenticate from "./common/middleware/authenticate";
 import couponRouter from "./coupon/couponRouter";
 import orderRouter from "./order/orderRouter";
 import paymentRouter from "./payment/paymentRouter";
+import cors from "cors";
+import config from "config";
 
 const app = express();
+
+const ALLOWED_DOMAINS = [
+  config.get("frontend.clientUI"),
+  config.get("frontend.adminUI"),
+];
+
+app.use(
+  cors({
+    origin: ALLOWED_DOMAINS as string[],
+    credentials: true,
+  }),
+);
 app.use(cookieParser());
 app.use(express.json());
 
