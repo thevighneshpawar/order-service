@@ -17,7 +17,7 @@ import {
   PaymentMode,
   PaymentStatus,
 } from "./orderTypes";
-import logger from "../configuration/logger";
+//import logger from "../configuration/logger";
 import idempotencyModel from "../idempotency/idempotencyModel";
 import mongoose from "mongoose";
 import createHttpError from "http-errors";

@@ -2,7 +2,7 @@ import express from "express";
 import authenticate from "../common/middleware/authenticate";
 import { asyncWrapper } from "../utils";
 import { OrderController } from "./orderController";
-import { StripeGW } from "../payment/stripe";
+//import { StripeGW } from "../payment/stripe";
 import { createGateway } from "../common/factories/gatewayFactory";
 import { createMessageBroker } from "../common/factories/brokerFactory";
 const router = express.Router();

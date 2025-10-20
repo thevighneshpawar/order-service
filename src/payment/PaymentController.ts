@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import { Request, Response } from "express";
 import orderModel from "../order/orderModel";
 import { PaymentGW } from "./paymentTypes";
 import { OrderEvents, PaymentStatus } from "../order/orderTypes";
